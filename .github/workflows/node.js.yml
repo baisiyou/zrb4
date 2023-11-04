@@ -1,0 +1,33 @@
+name: Node.js CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [12.x, 14.x, 16.x] # You can specify your desired Node.js versions here
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2 # Updated to use v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v2 # Updated to use v2
+      with:
+        node-version: ${{ matrix.node-version }}
+    - name: Install dependencies and build client
+      run: |
+        cd client
+        npm install
+        npm run build
+    - name: Start server with PM2
+      run: |
+        cd server
+        pm2 start app.js --name=weather
+        # You can uncomment the following line to restart if needed
+        # pm2 restart weather1
