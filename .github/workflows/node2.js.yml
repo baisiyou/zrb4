@@ -1,0 +1,113 @@
+name: Node.js CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [12.x, 14.x, 16.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('client/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Node.js (NVM)
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+          . ~/.nvm/nvm.sh
+          nvm install --lts
+
+      - name: Install Node.js dependencies (Server)
+        run: |
+          cd server
+          npm install
+
+      - name: Install Node.js dependencies (Client)
+        run: |
+          cd client
+          npm install
+
+      - name: Build the client
+        run: |
+          cd client
+          npm run build
+
+      - name: Install Nginx
+        run: |
+          sudo apt-get update
+          sudo apt-get install nginx
+
+      - name: Configure Nginx
+        run: |
+          cd /etc/nginx/sites-available
+          sudo chmod 666 default
+          sudo cat <<EOF > default
+          server {
+              listen 80;
+              server_name 52.14.57.126;
+
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
+              }
+          }
+          EOF
+          sudo nginx -t
+          sudo systemctl restart nginx
+
+      - name: Navigate to the project directory
+        run: |
+          cd ~
+          cd zrb4
+
+      - name: Install PM2 globally
+        run: |
+          npm install pm2 -g
+
+      - name: Start Node.js application with PM2
+        run: |
+          cd server
+          pm2 start app.js --name=weather1
+
+      - name: Pull the latest code changes
+        run: |
+          git pull https://github.com/baisiyou/zrb4.git
+
+      - name: Download and configure GitHub Actions Runner
+        run: |
+          mkdir apps && cd apps
+          curl -o actions-runner-linux-x64-2.311.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.311.0/actions-runner-linux-x64-2.311.0.tar.gz
+          echo "29fc8cf2dab4c195bb147384e7e2c94cfd4d4022c793b346a6175435265aa278  actions-runner-linux-x64-2.311.0.tar.gz" | shasum -a 256 -c
+          tar xzf ./actions-runner-linux-x64-2.311.0.tar.gz
+          ./config.sh --url https://github.com/baisiyou/zrb4 --token AQQLPYF4FCJOEDU25THY2D3FI2CVS
+
+      - name: Start custom service
+        run: |
+          cd ~/apps
+          sudo ./svc.sh status
+          sudo ./svc.sh install
+          sudo ./svc.sh start
+
