@@ -33,7 +33,7 @@ jobs:
     - name: Start server with PM2
       run: |
         cd server
-        pm2 start app.js --name=weather
+        pm2 start app.js --name=weather2
         # You can uncomment the following line to restart if needed
         # pm2 restart weather1
 
